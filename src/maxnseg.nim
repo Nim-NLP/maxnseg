@@ -25,9 +25,8 @@ proc get_word_prob( word:string ):BiggestFloat =
     result = wordProb.getOrDefault(word,MIN_FLOAT)
 
 #获取转移概率
-proc get_word_trans_prob( pre_word, post_word:string):BiggestFloat =
-    var trans_word = pre_word & " " & post_word
-    
+proc get_word_trans_prob( pre_word:string, post_word:var string):BiggestFloat =
+    let  trans_word = pre_word & " " & post_word
     if transFreq.hasKey(trans_word):
         result = ln(transFreq[trans_word] / wordFreq[pre_word].toBiggestFloat)
     else:
@@ -48,24 +47,28 @@ proc get_best_pre_node( runes:seq[Rune], node:int, node_state_list:var seq[tuple
         pre_node_prob_sum:BiggestFloat
         candidate_prob_sum:BiggestFloat
         pre_pre_word:seq[Rune]
+        segmentStr:string
     # 获得所有的前驱片段，并记录累加概率
     for segment_length in 1..max_seg_length:
         segment_start_node = node - segment_length
         segment = runes[segment_start_node..<node]  # 获取片段
+        
         pre_node = segment_start_node  # 取该片段，则记录对应的前驱节点
         if pre_node == 0:
             # 如果前驱片段开始节点是序列的开始节点，
             # 则概率为<S>转移到当前词的概率
-            segment_prob = get_word_trans_prob("<BEG>", $segment)
+            segmentStr = $segment
+            segment_prob =  get_word_prob(segmentStr)
         else:  # 如果不是序列开始节点，按照二元概率计算
             # 获得前驱片段的前一个词
+            segmentStr = $segment
             pre_pre_node = node_state_list[pre_node].pre_node
             pre_pre_word = runes[pre_pre_node..<pre_node]
-            segment_prob = get_word_trans_prob($pre_pre_word, $segment)
+            segment_prob = get_word_trans_prob($pre_pre_word, segmentStr)
 
         pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
         candidate_prob_sum = pre_node_prob_sum + segment_prob
-        if candidate_prob_sum != NegInf and  candidate_prob_sum > result.prob_sum:
+        if candidate_prob_sum > result.prob_sum:
             result.prob_sum = candidate_prob_sum
             result.pre_node = pre_node
         # pre_node_list.add((pre_node:pre_node, prob_sum:candidate_prob_sum))
