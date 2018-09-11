@@ -7,14 +7,17 @@ import tables
 import algorithm
 import unicode
 const
-    MIN_FLOAT = -3.14e100
+    MIN_FLOAT = BiggestFloat.low
 # 估算未出现的词的概率,根据beautiful data里面的方法估算，平滑算法
 proc get_unknow_word_prob( word:string):BiggestFloat = 
-    result = ln(1 / allFreq ^ runeLen(word))
+    try:
+        result = ln(1 / allFreq ^ runeLen(word))
+    except OverflowError:
+        result = MIN_FLOAT
 
 # 获取候选词的概率
 proc get_word_prob( word:string ):BiggestFloat = 
-    result = wordProb.getOrDefault(word,MIN_FLOAT)
+    result = wordProb.getOrDefault(word,get_unknow_word_prob(word))
 
 #获取转移概率
 proc get_word_trans_prob( pre_word, post_word:string):BiggestFloat =
@@ -26,7 +29,7 @@ proc get_word_trans_prob( pre_word, post_word:string):BiggestFloat =
         result = get_word_prob(post_word)
 
 # 寻找node的最佳前驱节点，方法为寻找所有可能的前驱片段
-proc get_best_pre_node( sentence:string, node:int, node_state_list:var seq[tuple[pre_node:int,prob_sum:BiggestFloat]]):tuple[pre_node:int,prob_sum:BiggestFloat]=
+proc get_best_pre_node( runes:seq[Rune], node:int, node_state_list:var seq[tuple[pre_node:int,prob_sum:BiggestFloat]]):tuple[pre_node:int,prob_sum:BiggestFloat]=
     # 如果node比最大词长小，取的片段长度以node的长度为限
     result.prob_sum = MIN_FLOAT
     var max_seg_length = min(node, maxWordLen)
@@ -40,7 +43,6 @@ proc get_best_pre_node( sentence:string, node:int, node_state_list:var seq[tuple
         pre_node_prob_sum:BiggestFloat
         candidate_prob_sum:BiggestFloat
         pre_pre_word:seq[Rune]
-        runes = sentence.toRunes()
     # 获得所有的前驱片段，并记录累加概率
     for segment_length in 1..max_seg_length:
         segment_start_node = node - segment_length
@@ -57,9 +59,7 @@ proc get_best_pre_node( sentence:string, node:int, node_state_list:var seq[tuple
             segment_prob = get_word_trans_prob($pre_pre_word, $segment)
 
         pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
-        # 当前node一个候选的累加概率值
         candidate_prob_sum = pre_node_prob_sum + segment_prob
-        echo candidate_prob_sum
         if candidate_prob_sum > result.prob_sum:
             result.prob_sum = candidate_prob_sum
             result.pre_node = pre_node
@@ -82,11 +82,12 @@ proc cut*( sentence:string ):seq[string]=
     # 字符串概率为2元概率， P(a b c) = P(a|<S>)P(b|a)P(c|b)
     # 逐个节点寻找最佳前驱节点
     var 
+        runes = sentence.toRunes()
         best_pre_node:int
         best_prob_sum:BiggestFloat
     for node in 1..runeLen(sentence):
         # 寻找最佳前驱，并记录当前最大的概率累加值
-        (best_pre_node, best_prob_sum) = get_best_pre_node(sentence, node, node_state_list)
+        (best_pre_node, best_prob_sum) = get_best_pre_node(runes, node, node_state_list)
 
         # 添加到队列
         node_state_list.add( (pre_node: best_pre_node,prob_sum: best_prob_sum) )
@@ -107,7 +108,7 @@ proc cut*( sentence:string ):seq[string]=
     best_path.reverse()
     # step 3, 构建切分
     var 
-        runes = sentence.toRunes()
+        
         left,right:int
         word:seq[Rune]
     for i in 0..<len(best_path)-1:
