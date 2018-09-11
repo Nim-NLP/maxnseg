@@ -9,15 +9,20 @@ import unicode
 const
     MIN_FLOAT = BiggestFloat.low
 # 估算未出现的词的概率,根据beautiful data里面的方法估算，平滑算法
-proc get_unknow_word_prob( word:string):BiggestFloat = 
-    try:
-        result = ln(1 / allFreq ^ runeLen(word))
-    except OverflowError:
-        result = MIN_FLOAT
+# proc get_unknow_word_prob( word:string):BiggestFloat = 
+#     try:
+#         result = ln(1 / allFreq ^ runeLen(word))
+#     except OverflowError:
+#         result = MIN_FLOAT
+#     if classify(result) == fcNan:
+#         result = MIN_FLOAT
+#     # elif result == NegInf:
+#     #     result = MIN_FLOAT
+#     echo result
 
 # 获取候选词的概率
 proc get_word_prob( word:string ):BiggestFloat = 
-    result = wordProb.getOrDefault(word,get_unknow_word_prob(word))
+    result = wordProb.getOrDefault(word,MIN_FLOAT)
 
 #获取转移概率
 proc get_word_trans_prob( pre_word, post_word:string):BiggestFloat =
@@ -60,7 +65,7 @@ proc get_best_pre_node( runes:seq[Rune], node:int, node_state_list:var seq[tuple
 
         pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
         candidate_prob_sum = pre_node_prob_sum + segment_prob
-        if candidate_prob_sum > result.prob_sum:
+        if candidate_prob_sum != NegInf and  candidate_prob_sum > result.prob_sum:
             result.prob_sum = candidate_prob_sum
             result.pre_node = pre_node
         # pre_node_list.add((pre_node:pre_node, prob_sum:candidate_prob_sum))

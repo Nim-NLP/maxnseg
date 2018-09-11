@@ -66,9 +66,8 @@ if __name__ == "__main__":
                                      indent=2).replace("}", "}.newTable")
                           )
     cleaned = ""
-    punc = "[\"|\s][\uFF00-\uFFFF！？。＂＃$＄％&＆'＇（）＊＋，－／：；<＜＝>＞@［＿｀`｛|｜｝~～《》｟｠｢｣、〃「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—‘’‛“”„‟…﹏]"
-    # punc = "[\"|\s][\uFF00-\uFFFF]" 全角数字？
-    
+    punc = "[\"|\s][０１２３４５６７８９！？。＂＃$＄％&＆'＇（）＊＋，－／：；<＜＝>＞@［＿｀`｛|｜｝~～《》｟｠｢｣、〃「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—‘’‛“”„‟…﹏]"
+     
     for line in result.splitlines(keepends=True):
         if re.search(punc,line) :
             continue
