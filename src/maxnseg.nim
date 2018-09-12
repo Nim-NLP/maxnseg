@@ -1,7 +1,8 @@
 # maxnseg
 # Copyright zhoupeng
 # A new awesome nimble package
-import maxnseg/model
+import maxnseg/freq_prob
+import maxnseg/backward_gram
 import math
 import tables
 import algorithm
@@ -22,13 +23,13 @@ const
 
 # 获取候选词的概率
 proc get_word_prob( word:string ):BiggestFloat = 
-    result = wordProb.getOrDefault(word,MIN_FLOAT)
+    result = wordFreqProb.getOrDefault(word,[0.0,MIN_FLOAT])[1]
 
 #获取转移概率
 proc get_word_trans_prob( pre_word:string, post_word:var string):BiggestFloat =
-    let  trans_word = pre_word & " " & post_word
-    if transFreq.hasKey(trans_word):
-        result = ln(transFreq[trans_word] / wordFreq[pre_word].toBiggestFloat)
+    # let  trans_word = pre_word & " " & post_word
+    if transFreq.hasKey(pre_word) and transFreq[pre_word].hasKey(post_word):
+        result = ln(transFreq[pre_word][post_word].toBiggestFloat / wordFreqProb[pre_word][1])
     else:
         result = get_word_prob(post_word)
 
