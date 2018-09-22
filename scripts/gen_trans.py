@@ -1,6 +1,6 @@
 import math
 import sys
-from os import path
+from os import path,unlink
 import json
 import re
 from collections import defaultdict
@@ -54,7 +54,7 @@ def init():
 if __name__ == "__main__":
     init()
     TEMPLATE = "let %s = %s\n"
-    result = "import tables\nimport hashes\n"
+    result = "import tables\n{.push checks: off, optimization: speed.}\n"
    
 
     # result += TEMPLATE % ("wordProb",
@@ -70,16 +70,19 @@ if __name__ == "__main__":
         freq_prob[k].append(float(v))
         freq_prob[k].append(word_dict[k])
 
-    freq_prob_str = "import tables\nimport hashes\n"
+    freq_prob_str = "import tables\n{.push checks: off, optimization: speed.}\n"
     freq_prob_str += "const allFreq* = %s\n" % all_freq
     freq_prob_str += "const maxWordLen* = %s\n" % max_wordlen
-    freq_prob_str += "const %s = %s\n" %  ("wordFreqProb*:Table[Hash,array[2,BiggestFloat]]", 
-                            re.sub('("[^\"]+")',r"\1.hash ",json.dumps(freq_prob, ensure_ascii=False).replace("}", "}.toTable"))
+    freq_prob_str += "let %s = %s\n" %  ("wordFreqProb*:TableRef[string,array[2,BiggestFloat]]", 
+                            json.dumps(freq_prob, ensure_ascii=False).replace("}", "}.newTable")
                           )
     
-    result += "const %s = %s\n" % ("transFreq*:Table[Hash,Table[Hash,int]]",
-                          re.sub('("[^\"]+")',r"\1.hash ",json.dumps(trans_dict_count, ensure_ascii=False,).replace("}", "}.toTable"))
-                          )
+    # result += "let %s = %s\n" % ("transFreq*:TableRef[string,TableRef[string,int]]",
+    #                       json.dumps(trans_dict_count, ensure_ascii=False).replace("}", "}.newTable")
+    #                       )
+    freq_prob_str += "\n{.pop.}"
+    result += "\n{.pop.}"
+    # re.sub('("[^\"]+")',r"\1.hash ",
     # cleaned = ""
     # punc = "[\"|\s][０１２３４５６７８９！？。＂＃$＄％&＆'＇（）＊＋，－／：；<＜＝>＞@［＿｀`｛|｜｝~～《》｟｠｢｣、〃「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—‘’‛“”„‟…﹏]"
      
@@ -88,8 +91,11 @@ if __name__ == "__main__":
     #         continue
     #     else:
     #         cleaned+=line
-
-    with open(path.join(cur_dir, "..", "src", "maxnseg", "backward_gram.nim"), "w") as f,\
+    bg = path.join(cur_dir, "..", "src", "maxnseg", "backward_gram.dict")
+    if path.exist(bg):
+        unlink(bg)
+    with open(bg, "a") as f,\
         open(path.join(cur_dir, "..", "src", "maxnseg", "freq_prob.nim"), "w") as f2:
-        f.write(result)
+        for k,v in trans_dict_count.items():
+            f.write(k+","+json.dumps(v, ensure_ascii=False)+"\n")
         f2.write(freq_prob_str)
