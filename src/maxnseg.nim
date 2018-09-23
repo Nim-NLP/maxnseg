@@ -10,6 +10,9 @@ import unicode
 import memfiles
 import regex
 import strutils
+import unicode
+import unicodedb/scripts
+import sequtils
 
 const
     MIN_FLOAT = BiggestFloat.low
@@ -31,8 +34,8 @@ mm.close()
 #         result = MIN_FLOAT
 #     if classify(result) == fcNan:
 #         result = MIN_FLOAT
-#     # elif result == NegInf:
-#     #     result = MIN_FLOAT
+    # elif result == NegInf:
+    #     result = MIN_FLOAT
 #     echo result
 
 # 获取候选词的概率
@@ -83,7 +86,7 @@ proc get_best_pre_node( runes:seq[Rune], node:int, node_state_list:var seq[PreNo
             # 如果前驱片段开始节点是序列的开始节点，
             # 则概率为<S>转移到当前词的概率
             segmentStr = $segment
-            segment_prob =  get_word_prob(segmentStr)
+            segment_prob =  get_word_trans_prob("<BEG>", segmentStr)
         else:  # 如果不是序列开始节点，按照二元概率计算
             # 获得前驱片段的前一个词
             segmentStr = $segment
@@ -101,7 +104,7 @@ proc get_best_pre_node( runes:seq[Rune], node:int, node_state_list:var seq[PreNo
     # return best_pre_node, best_prob_sum
 
 #切词主函数
-proc cut*( sentence:string ):seq[string]=
+proc internal_cut*( sentence:string ):seq[string]=
     # sentence = sentence.strip()
     # 初始化
     let a = (pre_node: -1,prob_sum: 0.0)
@@ -138,7 +141,6 @@ proc cut*( sentence:string ):seq[string]=
     best_path.reverse()
     # step 3, 构建切分
     var 
-        
         left,right:int
         word:seq[Rune]
     for i in 0..<len(best_path)-1:
@@ -146,3 +148,61 @@ proc cut*( sentence:string ):seq[string]=
         right = best_path[i + 1]
         word = runes[left..<right]
         result.add($word)
+
+proc isHan(r: Rune): bool =
+    # fast ascii check followed by unicode check
+    result = r.int > 127 and r.unicodeScript() == sptHan
+    
+proc containsHan(s: string): bool =
+  for r in s.runes:
+    if r.isHan:
+        result = true
+        break
+
+iterator splitHan(s: string): string =
+  var
+    i = 0
+    j = 0
+    k = 0
+    r: Rune
+    isHan = false
+    isHanCurr = false
+  fastRuneAt(s, i, r, false)
+  isHanCurr = r.isHan()
+  isHan = isHanCurr
+  while i < s.len:
+    while isHan == isHanCurr:
+      k = i
+      if i == s.len:
+        break
+      fastRuneAt(s, i, r, true)
+      isHanCurr = r.isHan()
+    yield s[j ..< k]
+    j = k
+    isHan = isHanCurr
+
+const
+    re_skip = re(r"([a-zA-Z0-9]+(?:\.\d+)?%?)")
+
+iterator cut*(sentence: string):string  = 
+    # if sentence.len > 0 and sentence.runeLen > 0:
+    var 
+        wordStr:string
+        # cuted:seq[string]
+    for blk in splitHan(sentence):
+        if blk.len == 0:
+            continue
+        if likely(containsHan(blk) == true):
+            # internal_cut2(blk,cuted)
+            for word in internal_cut(blk):
+                wordStr = $word
+                yield wordStr
+               
+        else:
+            yield blk
+
+proc lcut*(sentence:string):seq[string] {.noInit.} =
+    if len(sentence) == 0 or sentence.runeLen == 0:
+        result = @[]
+    else:
+        result = toSeq(cut(sentence))

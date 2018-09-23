@@ -33,7 +33,7 @@ proc main =
 
     for line in lines:
 
-        discard cut(line).join("/")
+        discard lcut(line).join("/")
        
     var endtime =  epochTime()
     echo (endtime - starttime)

@@ -38,7 +38,7 @@ def init():
     # 计算转移概率
     Trans_dict = load_model(word_trans_path)
     for pre_word, post_info in Trans_dict.items():
-        if re.search(punc,pre_word):
+        if pre_word != "<BEG>" and re.search(punc,pre_word):
             continue
         for post_word, count in post_info.items():
             if re.search(punc,post_word):
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     #     else:
     #         cleaned+=line
     bg = path.join(cur_dir, "..", "src", "maxnseg", "backward_gram.dict")
-    if path.exist(bg):
+    if path.exists(bg):
         unlink(bg)
     with open(bg, "a") as f,\
         open(path.join(cur_dir, "..", "src", "maxnseg", "freq_prob.nim"), "w") as f2:
