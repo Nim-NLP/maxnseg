@@ -2,7 +2,6 @@
 # Copyright zhoupeng
 # A new awesome nimble package
 import maxnseg/freq_prob
-# import maxnseg/backward_gram
 import math
 import tables
 import algorithm
@@ -13,9 +12,11 @@ import strutils
 import unicode
 import unicodedb/scripts
 import sequtils
+import maxnseg/sb
 
 const
     MIN_FLOAT = BiggestFloat.low
+    # dict = staticRead"maxnseg/backward_gram.dict".splitLines
 
 type PreNode = tuple[pre_node:int,prob_sum:BiggestFloat]
 
@@ -61,7 +62,7 @@ proc get_word_trans_prob( pre_word:string, post_word: string):BiggestFloat =
 
 
 # 寻找node的最佳前驱节点，方法为寻找所有可能的前驱片段
-proc get_best_pre_node(sentence:string, runes:seq[Rune], node:int, node_state_list:var seq[PreNode]):PreNode=
+proc get_best_pre_node(sentence:string,offsets:seq[int], node:int, node_state_list:var seq[PreNode]):PreNode=
     # 如果node比最大词长小，取的片段长度以node的长度为限
     result.prob_sum = MIN_FLOAT
     var max_seg_length = min(node, maxWordLen)
@@ -80,23 +81,20 @@ proc get_best_pre_node(sentence:string, runes:seq[Rune], node:int, node_state_li
     # 获得所有的前驱片段，并记录累加概率
     for segment_length in 1..max_seg_length:
         segment_start_node = node - segment_length
-        right = sentence.runeOffset(node)
-        left = sentence.runeOffset(segment_start_node)
-        if right < 0:
-            right = sentence.len
+        
+        right = offsets[node]
+        left = offsets[segment_start_node]
         segmentStr = sentence[left..<right]  # 获取片段
         pre_node = segment_start_node  # 取该片段，则记录对应的前驱节点
         if pre_node == 0:
             # 如果前驱片段开始节点是序列的开始节点，
             # 则概率为<S>转移到当前词的概率
-            segment_prob =  get_word_trans_prob("<BEG>", segmentStr)
+            segment_prob = if wordFreq.hasKey(segmentStr): wordFreq[segmentStr].toBiggestFloat() else: MIN_FLOAT
         else:  # 如果不是序列开始节点，按照二元概率计算
             # 获得前驱片段的前一个词
-            right = sentence.runeOffset(pre_node)
+            right = offsets[pre_node]
             pre_pre_node = node_state_list[pre_node].pre_node
-            left = sentence.runeOffset(pre_pre_node)
-            if right < 0:
-                right = sentence.len
+            left = offsets[pre_pre_node]
             pre_pre_word = sentence[left..<right]
             segment_prob = get_word_trans_prob(pre_pre_word, segmentStr)
         pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
@@ -106,11 +104,8 @@ proc get_best_pre_node(sentence:string, runes:seq[Rune], node:int, node_state_li
     # 找到最大的候选概率值
     result = max(pre_node_list)
 
-    # return best_pre_node, best_prob_sum
-
 #切词主函数
 proc internal_cut*( sentence:string ):seq[string]=
-    # sentence = sentence.strip()
     # 初始化
     let a = (pre_node: -1,prob_sum: 0.0)
     var node_state_list:seq[PreNode] = @[a]  
@@ -120,21 +115,31 @@ proc internal_cut*( sentence:string ):seq[string]=
     # 字符串概率为2元概率， P(a b c) = P(a|<S>)P(b|a)P(c|b)
     # 逐个节点寻找最佳前驱节点
     var 
-        runes = sentence.toRunes()
-        runesLen = runes.len
+        offsets:seq[int]
+        runesLen:Natural
         best_pre_node:int
+        i:int
+        j:int
+        rune:Rune
         best_prob_sum:BiggestFloat
+
+    while i < sentence.len:
+        offsets.add i
+        fastRuneAt(sentence, i,rune)
+        
+        inc j
+    offsets.add sentence.len
+    runesLen = j
     for node in 1..runesLen:
         # 寻找最佳前驱，并记录当前最大的概率累加值
-        (best_pre_node, best_prob_sum) = get_best_pre_node(sentence,runes, node, node_state_list)
+        (best_pre_node, best_prob_sum) = get_best_pre_node(sentence,offsets, node, node_state_list)
         # 添加到队列
         node_state_list.add( (pre_node: best_pre_node,prob_sum: best_prob_sum) )
-        # print "cur node list",node_state_list
     # step 2, 获得最优路径,从后到前
     var 
         best_path:seq[int] = @[]
         pre_node:int
-        node = runesLen  # 最后一个点
+        node = runesLen # 最后一个点
     best_path.add(node)
     while true:
         pre_node = node_state_list[node].pre_node
@@ -150,10 +155,8 @@ proc internal_cut*( sentence:string ):seq[string]=
     for i in 0..<len(best_path)-1:
         left = best_path[i]
         right = best_path[i + 1]
-        right = sentence.runeOffset(right)
-        if right < 0:
-            right = sentence.len
-        word = sentence[sentence.runeOffset(left)..<right]
+        right = offsets[right]
+        word = sentence[offsets[left]..<right]
         result.add(word)
 
 proc isHan(r: Rune): bool =
@@ -188,23 +191,14 @@ iterator splitHan(s: string): string =
     j = k
     isHan = isHanCurr
 
-const
-    re_skip = re(r"([a-zA-Z0-9]+(?:\.\d+)?%?)")
-
 iterator cut*(sentence: string):string  = 
     # if sentence.len > 0 and sentence.runeLen > 0:
-    # var 
-    #     wordStr:string
-        # cuted:seq[string]
     for blk in splitHan(sentence):
         if blk.len == 0:
             continue
         if likely(containsHan(blk) == true):
-            # internal_cut2(blk,cuted)
             for wordStr in internal_cut(blk):
-                # wordStr = $word
-                yield wordStr
-               
+                yield wordStr 
         else:
             yield blk
 

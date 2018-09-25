@@ -92,10 +92,17 @@ if __name__ == "__main__":
     #     else:
     #         cleaned+=line
     bg = path.join(cur_dir, "..", "src", "maxnseg", "backward_gram.dict")
+    sb = path.join(cur_dir, "..", "src", "maxnseg", "sb.nim")
     if path.exists(bg):
         unlink(bg)
     with open(bg, "a") as f,\
-        open(path.join(cur_dir, "..", "src", "maxnseg", "freq_prob.nim"), "w") as f2:
+        open(path.join(cur_dir, "..", "src", "maxnseg", "freq_prob.nim"), "w") as f2,\
+        open(sb,"w") as f3:
         for k,v in trans_dict_count.items():
-            f.write(k+","+json.dumps(v, ensure_ascii=False)+"\n")
+            if k == "<BEG>":
+                f3.write("import tables\nlet %s = %s\n" %  ("wordFreq*:TableRef[string,int]", 
+                            json.dumps(trans_dict_count[k], ensure_ascii=False,indent=4).replace("}", "}.newTable")
+                          ))
+            else:
+                f.write(k+","+json.dumps(v, ensure_ascii=False)+"\n")
         f2.write(freq_prob_str)
