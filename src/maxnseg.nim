@@ -1,6 +1,9 @@
 # maxnseg
 # Copyright zhoupeng
-# A new awesome nimble package
+# MaxProbNgram Chinese word segment
+# port from https://github.com/liuhuanyong/WordSegment/blob/master/max_ngram.py
+# base on this article: https://blog.csdn.net/wangliang_f/article/details/17532633
+
 import maxnseg/freq_prob
 import math
 import tables
@@ -27,7 +30,7 @@ var
 
 mm = memfiles.open("src/maxnseg/backward_gram.dict", mode = fmRead)
 mm.close()
-# 估算未出现的词的概率,根据beautiful data里面的方法估算，平滑算法
+
 # proc get_unknow_word_prob( word:string):BiggestFloat = 
 #     try:
 #         result = ln(1 / allFreq ^ runeLen(word))
@@ -35,9 +38,8 @@ mm.close()
 #         result = MIN_FLOAT
 #     if classify(result) == fcNan:
 #         result = MIN_FLOAT
-    # elif result == NegInf:
-    #     result = MIN_FLOAT
-#     echo result
+#     elif result == NegInf:
+#         result = MIN_FLOAT
 
 # 获取候选词的概率
 proc get_word_prob( word:string ):BiggestFloat = 
@@ -48,6 +50,10 @@ proc existInDict(q:string):tuple[a:bool,b:string]=
         if x.startsWith(q):
             result[0] = true
             result[1] = x.substr(q.len - 1)
+
+proc s2b(str:string):BiggestFloat = 
+    result = ln(wordFreq[str].toBiggestFloat / wordFreqProb["<BEG>"][0])
+
 #获取转移概率
 proc get_word_trans_prob( pre_word:string, post_word: string):BiggestFloat =
     result = get_word_prob(post_word)
@@ -60,28 +66,22 @@ proc get_word_trans_prob( pre_word:string, post_word: string):BiggestFloat =
             if a.find(re"(\d+)",m):
                 result = ln(parseInt(a[m.group(0)[0]]).toBiggestFloat / wordFreqProb[pre_word][1])
 
-
 # 寻找node的最佳前驱节点，方法为寻找所有可能的前驱片段
 proc get_best_pre_node(sentence:string,offsets:seq[int], node:int, node_state_list:var seq[PreNode]):PreNode=
     # 如果node比最大词长小，取的片段长度以node的长度为限
-    result.prob_sum = MIN_FLOAT
-    var max_seg_length = min(node, maxWordLen)
+    let max_seg_length = min(node, maxWordLen)
     var pre_node_list:seq[PreNode] = @[]  # 前驱节点列表
     var 
         segment_start_node:int
-        # segment:seq[Rune]
         pre_node:int
         segment_prob:BiggestFloat
         pre_pre_node:int
-        pre_node_prob_sum:BiggestFloat
-        candidate_prob_sum:BiggestFloat
         pre_pre_word:string
         segmentStr:string
         right,left:int
     # 获得所有的前驱片段，并记录累加概率
     for segment_length in 1..max_seg_length:
         segment_start_node = node - segment_length
-        
         right = offsets[node]
         left = offsets[segment_start_node]
         segmentStr = sentence[left..<right]  # 获取片段
@@ -89,7 +89,7 @@ proc get_best_pre_node(sentence:string,offsets:seq[int], node:int, node_state_li
         if pre_node == 0:
             # 如果前驱片段开始节点是序列的开始节点，
             # 则概率为<S>转移到当前词的概率
-            segment_prob = if wordFreq.hasKey(segmentStr): wordFreq[segmentStr].toBiggestFloat() else: MIN_FLOAT
+            segment_prob = if wordFreq.hasKey(segmentStr): s2b(segmentStr) else: MIN_FLOAT
         else:  # 如果不是序列开始节点，按照二元概率计算
             # 获得前驱片段的前一个词
             right = offsets[pre_node]
@@ -97,9 +97,8 @@ proc get_best_pre_node(sentence:string,offsets:seq[int], node:int, node_state_li
             left = offsets[pre_pre_node]
             pre_pre_word = sentence[left..<right]
             segment_prob = get_word_trans_prob(pre_pre_word, segmentStr)
-        pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
-        candidate_prob_sum = pre_node_prob_sum + segment_prob
-        pre_node_list.add((pre_node:pre_node, prob_sum:candidate_prob_sum))
+        # pre_node_prob_sum = node_state_list[pre_node].prob_sum  # 前驱节点的概率的累加值
+        pre_node_list.add((pre_node:pre_node, prob_sum:node_state_list[pre_node].prob_sum + segment_prob))
 
     # 找到最大的候选概率值
     result = max(pre_node_list)
@@ -126,10 +125,12 @@ proc internal_cut*( sentence:string ):seq[string]=
     while i < sentence.len:
         offsets.add i
         fastRuneAt(sentence, i,rune)
-        
         inc j
+
     offsets.add sentence.len
+
     runesLen = j
+
     for node in 1..runesLen:
         # 寻找最佳前驱，并记录当前最大的概率累加值
         (best_pre_node, best_prob_sum) = get_best_pre_node(sentence,offsets, node, node_state_list)
