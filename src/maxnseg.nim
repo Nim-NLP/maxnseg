@@ -16,19 +16,33 @@ import unicode
 import unicodedb/scripts
 import sequtils
 import maxnseg/sb
+import ospaths
+import random
 
 const
     MIN_FLOAT = BiggestFloat.low
-    # dict = staticRead"maxnseg/backward_gram.dict".splitLines
+    dict = staticRead"maxnseg/backward_gram.dict"
 
 type PreNode = tuple[pre_node:int,prob_sum:BiggestFloat]
 
 proc `<`(a,b:PreNode):bool =
     return a.prob_sum < b.prob_sum
+
+proc getRandomStr*(count: int): string =
+  const Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUWXYZ"
+  for x in 0..<count:
+    result.add rand(Alphabet)
+
+randomize()
+
 var
     mm:MemFile
+    dest = getTempDir() / "backward_gram.dict." & getRandomStr(10)
 
-mm = memfiles.open("src/maxnseg/backward_gram.dict", mode = fmRead)
+let temp = system.open(dest,fmWrite)
+temp.write(dict)
+temp.close()
+mm = memfiles.open(dest, mode = fmRead)
 mm.close()
 
 # proc get_unknow_word_prob( word:string):BiggestFloat = 
