@@ -17,7 +17,7 @@ import unicodedb/scripts
 import sequtils
 import maxnseg/sb
 import ospaths
-import random
+# import random
 
 const
     MIN_FLOAT = BiggestFloat.low
@@ -28,20 +28,20 @@ type PreNode = tuple[pre_node:int,prob_sum:BiggestFloat]
 proc `<`(a,b:PreNode):bool =
     return a.prob_sum < b.prob_sum
 
-proc getRandomStr*(count: int): string =
-  const Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUWXYZ"
-  for x in 0..<count:
-    result.add rand(Alphabet)
+# proc getRandomStr*(count: int): string =
+#   const Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUWXYZ"
+#   for x in 0..<count:
+#     result.add rand(Alphabet)
 
-randomize()
+# randomize()
 
 var
     mm:MemFile
-    dest = getTempDir() / "backward_gram.dict." & getRandomStr(10)
+    dest = parentDir(currentSourcePath()) / "maxnseg" / "backward_gram.dict" # & getRandomStr(10)
 
-let temp = system.open(dest,fmWrite)
-temp.write(dict)
-temp.close()
+# let temp = system.open(dest,fmWrite)
+# temp.write(dict)
+# temp.close()
 mm = memfiles.open(dest, mode = fmRead)
 mm.close()
 
